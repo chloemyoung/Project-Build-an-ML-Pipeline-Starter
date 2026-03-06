@@ -1,5 +1,5 @@
 main:
-  components_repository: "components"
+  components_repository: "./src"
   # All the intermediate files will be copied to this directory at the end of the run.
   # Set this to null if you are running in prod
   project_name: nyc_airbnb
@@ -7,8 +7,13 @@ main:
   steps: all
 etl:
   sample: "sample1.csv"
-  min_price: 10  # dollars
-  max_price: 350  # dollars
+  output_artifact: "clean_data.csv"
+  output_type: "clean_data"
+  output_description: "Basic cleaned Airbnb dataset"
+  min_price: 10
+  max_price: 350
+  test_size: 0.2
+  random_seed: 42
 data_check:
   kl_threshold: 0.2
 modeling:
@@ -27,11 +32,12 @@ modeling:
   # RandomForestRegressor. This is a subsample, but more could be added:
   random_forest:
     n_estimators: 100
-    max_depth: 15
-    min_samples_split: 4
-    min_samples_leaf: 3
+    max_depth: 10
+    min_samples_split: 2
+    min_samples_leaf: 1
     # Here -1 means all available cores
     n_jobs: -1
+    random_state: 42
     criterion: squared_error
     max_features: 0.5
     # DO not change the following
