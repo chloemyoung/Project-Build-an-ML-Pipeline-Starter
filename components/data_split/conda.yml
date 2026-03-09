@@ -1,0 +1,10 @@
+name: data_split
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pandas
+  - numpy
+  - pip
+  - pip:
+      - wandb

@@ -1,0 +1,9 @@
+name: basic_cleaning_env
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - pandas
+      - wandb

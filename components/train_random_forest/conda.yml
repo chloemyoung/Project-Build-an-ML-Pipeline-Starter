@@ -1,0 +1,10 @@
+name: train_random_forest_env
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - pandas
+      - scikit-learn
+      - wandb

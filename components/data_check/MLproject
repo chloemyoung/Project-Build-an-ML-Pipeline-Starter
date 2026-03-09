@@ -1,0 +1,12 @@
+name: data_check
+
+conda_env: conda.yml
+
+entry_points:
+  main:
+    command: "python run.py --csv {csv} --ref {ref}"
+    parameters:
+      csv:
+        type: str
+      ref:
+        type: str

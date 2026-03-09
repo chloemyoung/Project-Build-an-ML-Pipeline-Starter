@@ -1,0 +1,7 @@
+main:
+  min_price: 10
+  max_price: 350
+  test_size: 0.2
+  random_seed: 42
+  components_repository: ./components
+  steps: all

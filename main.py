@@ -1,91 +1,60 @@
-import json
+# main.py
 import mlflow
-import tempfile
-import os
-import wandb
-import hydra
-from omegaconf import DictConfig
+from pathlib import Path
+from omegaconf import OmegaConf
 
-_steps = [
-    "download",
-    "basic_cleaning",
-    "data_check",
-    "data_split",
-    "train_random_forest",
-]
+# Load config
+config_path = Path("config/config.yaml")
+config = OmegaConf.load(config_path)
 
-@hydra.main(version_base=None, config_name="config", config_path=".")
-def go(config: DictConfig):
+# Root project path
+project_root = Path(__file__).parent
 
-    os.environ["WANDB_PROJECT"] = config["main"]["project_name"]
-    os.environ["WANDB_RUN_GROUP"] = config["main"]["experiment_name"]
+# Check which steps to run (Hydra-compatible)
+steps = config.main.get("steps", [])
 
-    steps_par = config["main"]["steps"]
-    active_steps = steps_par.split(",") if steps_par != "all" else _steps
+# Example: if you want to allow passing via CLI with Hydra:
+# python main.py +main.steps=[get_data,basic_cleaning,train_model]
+if isinstance(steps, str):
+    steps = [steps]  # ensure list
 
-    with tempfile.TemporaryDirectory():
+# --- Step 1: Get Data ---
+if "get_data" in steps or "all" in steps:
+    mlflow.run(
+        str(project_root / "components/get_data"),
+        parameters={
+            "sample": "sample1.csv",
+            "artifact_name": "sample.csv",
+            "artifact_type": "raw_data",
+            "artifact_description": "'Raw_file_as_downloaded'",  # single quotes to avoid split
+        },
+        experiment_name="nyc_airbnb",
+    )
 
-        if "download" in active_steps:
+# --- Step 2: Basic Cleaning ---
+if "basic_cleaning" in steps or "all" in steps:
+    mlflow.run(
+        str(project_root / "components/basic_cleaning"),
+        parameters={
+            "input_artifact": "sample.csv:latest",  # W&B collection:alias format
+            "output_artifact": "clean_sample.csv",
+            "output_type": "clean_data",
+            "output_description": "'Cleaned_Airbnb_data'",  # wrap in single quotes
+            "min_price": config.main.min_price,
+            "max_price": config.main.max_price,
+        },
+        experiment_name="nyc_airbnb",
+    )
 
-            _ = mlflow.run(
-                uri="./src/get_data",
-                entry_point="main",
-                env_manager="local",
-                parameters={
-                    "sample": config["etl"]["sample"],
-                    "artifact_name": "sample.csv",
-                    "artifact_type": "raw_data",
-                    "artifact_description": "Raw dataset"
-                },
-            )
-
-        if "basic_cleaning" in active_steps:
-
-            _ = mlflow.run(
-                os.path.join("src", "basic_cleaning"),
-                entry_point="main",
-                env_manager="local",
-                parameters={
-                    "input_artifact": config["etl"]["sample"],
-                    "output_artifact": config["etl"]["output_artifact"],
-                    "output_type": config["etl"]["output_type"],
-                    "output_description": config["etl"]["output_description"],
-                    "min_price": config["etl"]["min_price"],
-                    "max_price": config["etl"]["max_price"],
-                },
-            )
-
-        if "data_split" in active_steps:
-
-            _ = mlflow.run(
-                os.path.join("src", "train_val_test_split"),
-                entry_point="main",
-                env_manager="local",
-                parameters={
-                    "input": f'{config["etl"]["output_artifact"]}:latest',
-                    "test_size": 0.2,
-                    "random_seed": 42,
-                    "stratify_by": "neighbourhood_group",
-                },
-            )
-
-        if "train_random_forest" in active_steps:
-
-            rf_config = os.path.abspath("rf_config.json")
-
-            with open(rf_config, "w") as fp:
-                json.dump(dict(config["modeling"]["random_forest"].items()), fp)
-
-            _ = mlflow.run(
-                os.path.join("src", "train_random_forest"),
-                entry_point="main",
-                env_manager="local",
-                parameters={
-                    "trainval_artifact": "trainval_data.csv:latest",
-                    "test_artifact": "test_data.csv:latest",
-                    "rf_config": rf_config,
-                },
-            )
-
-if __name__ == "__main__":
-    go()
+# --- Step 3: Training Model ---
+if "train_model" in steps or "all" in steps:
+    mlflow.run(
+        str(project_root / "components/train_model"),
+        parameters={
+            "input_artifact": "clean_sample.csv:latest",
+            "test_size": config.main.test_size,
+            "random_seed": config.main.random_seed,
+            "output_model": "model.pkl",
+        },
+        experiment_name="nyc_airbnb",
+    )

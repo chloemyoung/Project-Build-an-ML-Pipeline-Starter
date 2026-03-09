@@ -1,71 +1,50 @@
-#!/usr/bin/env python
-"""
-This script splits the provided dataframe in test and remainder
-"""
 import argparse
-import logging
 import pandas as pd
-import wandb
-import tempfile
+import mlflow
 from sklearn.model_selection import train_test_split
-from wandb_utils.log_artifact import log_artifact
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
-logger = logging.getLogger()
-
+import os
 
 def go(args):
+    # Load cleaned dataset
+    df = pd.read_csv(args.input)
 
-    run = wandb.init(job_type="train_val_test_split")
-    run.config.update(args)
+    stratify_col = df[args.stratify_by] if args.stratify_by.lower() != "none" else None
 
-    # Download input artifact. This will also note that this script is using this
-    # particular version of the artifact
-    logger.info(f"Fetching artifact {args.input}")
-    artifact_local_path = run.use_artifact(args.input).file()
-
-    df = pd.read_csv(artifact_local_path)
-
-    logger.info("Splitting trainval and test")
-    trainval, test = train_test_split(
+    # Split into train+val and test
+    trainval_df, test_df = train_test_split(
         df,
         test_size=args.test_size,
         random_state=args.random_seed,
-        stratify=df[args.stratify_by] if args.stratify_by != 'none' else None,
+        stratify=stratify_col
     )
 
-    # Save to output files
-    for df, k in zip([trainval, test], ['trainval', 'test']):
-        logger.info(f"Uploading {k}_data.csv dataset")
-        with tempfile.NamedTemporaryFile("w", delete=False) as fp:
+    # Further split train+val into train and val (using same fraction)
+    val_fraction = 0.2  # can make configurable
+    train_df, val_df = train_test_split(
+        trainval_df,
+        test_size=val_fraction,
+        random_state=args.random_seed,
+        stratify=trainval_df[args.stratify_by] if args.stratify_by.lower() != "none" else None
+    )
 
-            df.to_csv(fp.name, index=False)
+    # Save CSVs
+    trainval_path = os.path.abspath("trainval_data.csv")
+    test_path = os.path.abspath("test_data.csv")
+    train_df.to_csv(trainval_path, index=False)
+    test_df.to_csv(test_path, index=False)
 
-            log_artifact(
-                fp.name,
-                f"{k}_data.csv",
-                f"{k}_data",
-                run,
-            )
+    print(f"Train+Val saved: {trainval_path}")
+    print(f"Test saved: {test_path}")
 
+    # Log artifacts to MLflow/W&B
+    mlflow.log_artifact(trainval_path)
+    mlflow.log_artifact(test_path)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Split test and remainder")
-
-    parser.add_argument("input", type=str, help="Input artifact to split")
-
-    parser.add_argument(
-        "test_size", type=float, help="Size of the test split. Fraction of the dataset, or number of items"
-    )
-
-    parser.add_argument(
-        "--random_seed", type=int, help="Seed for random number generator", default=42, required=False
-    )
-
-    parser.add_argument(
-        "--stratify_by", type=str, help="Column to use for stratification", default='none', required=False
-    )
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=str, required=True)
+    parser.add_argument("--test_size", type=float, required=True)
+    parser.add_argument("--random_seed", type=int, required=True)
+    parser.add_argument("--stratify_by", type=str, required=True)
     args = parser.parse_args()
-
     go(args)
