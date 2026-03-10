@@ -10,6 +10,8 @@ def go(args):
     # Basic cleaning: filter by price
     df = df[(df["price"] >= args.min_price) & (df["price"] <= args.max_price)]
 
+    df = df.drop_duplicates()
+
     # Save cleaned CSV
     output_csv_path = os.path.abspath(args.output_artifact)
     df.to_csv(output_csv_path, index=False)
