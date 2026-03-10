@@ -1,6 +1,6 @@
 ## Project Links
 
-- **GitHub Repository:** https://github.com/yourusername/your-repo
+- **GitHub Repository:** https://github.com/chloemyoung/Project-Build-an-ML-Pipeline-Starter
 - **Weights & Biases Project:** https://wandb.ai/chloemyoung-western-governors-university/Project-Build-an-ML-Pipeline-Starter
 
 
